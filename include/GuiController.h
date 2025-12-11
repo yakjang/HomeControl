@@ -11,7 +11,8 @@ public:
   void update();
   void updateStatus(bool wifi, bool mqtt, String timeStr);
   void updateBacklight(uint8_t brightness);
-  void setNetworkManager(NetworkManager *network); // New method
+  void setNetworkManager(NetworkManager *network);
+  void processMqttMessage(const char *topic, const char *payload); // New method
 
 private:
   static void disp_flush(lv_disp_drv_t *disp, const lv_area_t *area,

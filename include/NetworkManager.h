@@ -3,6 +3,9 @@
 #include <PubSubClient.h>
 #include <WiFi.h>
 
+// Define standard MQTT Callback Signature
+typedef void (*MqttCallback)(char *, uint8_t *, unsigned int);
+
 class NetworkManager {
 public:
   NetworkManager();
@@ -11,9 +14,12 @@ public:
   void update();
   bool isWifiConnected();
   bool isMqttConnected();
-  void setMqttCallback(
-      std::function<void(char *, uint8_t *, unsigned int)> callback);
+
+  // Changed to raw function pointer to match PubSubClient
+  void setMqttCallback(MqttCallback callback);
+
   void publish(const char *topic, const char *payload);
+  void publishDiscovery();
 
 private:
   const char *_ssid;
