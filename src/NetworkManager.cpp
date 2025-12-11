@@ -6,11 +6,14 @@ NetworkManager::NetworkManager() : _wifiClient(), _mqttClient(_wifiClient) {
 }
 
 void NetworkManager::begin(const char *ssid, const char *password,
-                           const char *mqttServer, int mqttPort) {
+                           const char *mqttServer, int mqttPort,
+                           const char *mqttUser, const char *mqttPassword) {
   _ssid = ssid;
   _password = password;
   _mqttServer = mqttServer;
   _mqttPort = mqttPort;
+  _mqttUser = mqttUser;
+  _mqttPassword = mqttPassword;
 
   WiFi.mode(WIFI_STA);
   connectWifi();
@@ -56,7 +59,9 @@ void NetworkManager::connectMqtt() {
   Serial.println(_mqttServer);
   String clientId = "ESP32S3-Client-";
   clientId += String(random(0xffff), HEX);
-  if (_mqttClient.connect(clientId.c_str())) {
+
+  // Use Authentication
+  if (_mqttClient.connect(clientId.c_str(), _mqttUser, _mqttPassword)) {
     Serial.println("MQTT Connected");
     _mqttClient.subscribe("home/livingroom/light/set");
   } else {
@@ -68,3 +73,10 @@ void NetworkManager::connectMqtt() {
 bool NetworkManager::isWifiConnected() { return WiFi.status() == WL_CONNECTED; }
 
 bool NetworkManager::isMqttConnected() { return _mqttClient.connected(); }
+
+void NetworkManager::publish(const char *topic, const char *payload) {
+  if (isMqttConnected()) {
+    _mqttClient.publish(topic, payload);
+    Serial.printf("MQTT PUB: %s -> %s\n", topic, payload);
+  }
+}

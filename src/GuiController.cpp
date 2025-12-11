@@ -25,6 +25,9 @@ void GuiController::touchpad_read(lv_indev_drv_t *indev_driver,
   bool touched = tft.getTouch(&touchX, &touchY);
 
   if (touched) {
+    // Debug Touch
+    // Serial.printf("Touch Detected: X=%d, Y=%d\n", touchX, touchY);
+
     data->state = LV_INDEV_STATE_PR;
     data->point.x = touchX;
     data->point.y = touchY;
@@ -72,14 +75,88 @@ void GuiController::applyCyberpunkTheme() {
 void GuiController::createUI() {
   // Header
   _statusBar = lv_obj_create(lv_scr_act());
-  lv_obj_set_size(_statusBar, 800, 40);
-  lv_obj_set_style_bg_color(_statusBar, lv_color_hex(0x101010), 0);
+  lv_obj_set_size(_statusBar, 800, 50);
+  lv_obj_set_style_bg_color(_statusBar, lv_color_hex(0x151515), 0);
   lv_obj_set_style_border_color(_statusBar, lv_color_hex(0x00FFFF), 0);
-  lv_obj_set_style_border_width(_statusBar, 2, 0);
+  lv_obj_set_style_border_width(_statusBar, 0, 0); // Clean look
+  lv_obj_set_style_border_side(_statusBar, LV_BORDER_SIDE_BOTTOM, 0);
   lv_obj_align(_statusBar, LV_ALIGN_TOP_MID, 0, 0);
 
-  lv_label_set_text(_statusLabel, "SYSTEM READY");
-  lv_obj_align(_statusLabel, LV_ALIGN_CENTER, 0, 0);
+  // Status Label (Time)
+  _statusLabel = lv_label_create(_statusBar);
+  lv_label_set_text(_statusLabel, "12:00");
+  lv_obj_align(_statusLabel, LV_ALIGN_RIGHT_MID, -20, 0);
+  lv_obj_set_style_text_font(_statusLabel, &lv_font_montserrat_20, 0);
+  lv_obj_set_style_text_color(_statusLabel, lv_color_hex(0xFFFFFF), 0);
+
+  // MAIN CONTENT AREA
+  // -----------------
+
+  // 1. Light Control Button
+  _btnLight = lv_btn_create(lv_scr_act());
+  lv_obj_set_size(_btnLight, 200, 200);
+  lv_obj_align(_btnLight, LV_ALIGN_CENTER, -150, 20);
+  lv_obj_add_event_cb(_btnLight, btn_event_cb, LV_EVENT_ALL, this);
+  lv_obj_add_flag(_btnLight, LV_OBJ_FLAG_CHECKABLE); // Toggle mode
+
+  // Apply "Neon" Style
+  lv_obj_set_style_bg_color(_btnLight, lv_color_hex(0x202020), 0);
+  lv_obj_set_style_shadow_width(_btnLight, 20, 0);
+  lv_obj_set_style_shadow_color(_btnLight, lv_color_hex(0x00FFFF), 0);
+
+  _labelLight = lv_label_create(_btnLight);
+  lv_label_set_text(_labelLight, "LIGHT\nOFF");
+  lv_obj_center(_labelLight);
+  lv_obj_set_style_text_align(_labelLight, LV_TEXT_ALIGN_CENTER, 0);
+  lv_obj_set_style_text_font(_labelLight, &lv_font_montserrat_28, 0);
+
+  // 2. Brightness Slider
+  _sliderBrightness = lv_slider_create(lv_scr_act());
+  lv_obj_set_size(_sliderBrightness, 30, 200);
+  lv_obj_align(_sliderBrightness, LV_ALIGN_CENTER, 150, 20);
+  lv_slider_set_range(_sliderBrightness, 10, 255);
+  lv_slider_set_value(_sliderBrightness, 255, LV_ANIM_OFF);
+  lv_obj_add_event_cb(_sliderBrightness, slider_event_cb,
+                      LV_EVENT_VALUE_CHANGED, this);
+
+  // Slider Label
+  lv_obj_t *labelBright = lv_label_create(lv_scr_act());
+  lv_label_set_text(labelBright, "BRIGHT");
+  lv_obj_align_to(labelBright, _sliderBrightness, LV_ALIGN_OUT_BOTTOM_MID, 0,
+                  10);
+  lv_obj_set_style_text_color(labelBright, lv_color_hex(0xAAAAAA), 0);
+}
+
+// Callbacks
+void GuiController::btn_event_cb(lv_event_t *e) {
+  lv_event_code_t code = lv_event_get_code(e);
+  lv_obj_t *btn = lv_event_get_target(e);
+  GuiController *gui = (GuiController *)lv_event_get_user_data(e);
+
+  if (code == LV_EVENT_VALUE_CHANGED) {
+    bool state = lv_obj_has_state(btn, LV_STATE_CHECKED);
+    if (state) {
+      lv_label_set_text(gui->_labelLight, "LIGHT\nON");
+      lv_obj_set_style_bg_color(btn, lv_color_hex(0x00AAAA), 0); // Active color
+      lv_obj_set_style_shadow_color(btn, lv_color_hex(0x00FFFF), 0);
+      // TODO: Publish MQTT "ON"
+      // network.publish("home/livingroom/light/set", "ON"); (Need to link
+      // NetworkManager)
+    } else {
+      lv_label_set_text(gui->_labelLight, "LIGHT\nOFF");
+      lv_obj_set_style_bg_color(btn, lv_color_hex(0x202020),
+                                0); // Inactive color
+      lv_obj_set_style_shadow_color(btn, lv_color_hex(0x000000), 0);
+      // TODO: Publish MQTT "OFF"
+    }
+  }
+}
+
+void GuiController::slider_event_cb(lv_event_t *e) {
+  lv_obj_t *slider = lv_event_get_target(e);
+  GuiController *gui = (GuiController *)lv_event_get_user_data(e);
+  int val = lv_slider_get_value(slider);
+  gui->updateBacklight((uint8_t)val);
 }
 
 void GuiController::update() { lv_timer_handler(); }
@@ -88,4 +165,12 @@ void GuiController::updateStatus(bool wifi, bool mqtt, String timeStr) {
   String status = "WiFi: " + String(wifi ? "ON" : "OFF") +
                   " | MQTT: " + String(mqtt ? "ON" : "OFF") + " | " + timeStr;
   lv_label_set_text(_statusLabel, status.c_str());
+}
+
+void GuiController::updateBacklight(uint8_t brightness) {
+  tft.setBrightness(brightness);
+}
+
+void GuiController::setNetworkManager(NetworkManager *network) {
+  _network = network;
 }

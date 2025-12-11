@@ -1,0 +1,6 @@
+COM3
+----
+Hardware ID: USB VID:PID=1A86:55D3 SER=58FA099120 LOCATION=1-10
+Description: USB-Enhanced-SERIAL CH343 (COM3)
+
+
